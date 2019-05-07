@@ -6,7 +6,6 @@ import base64
 import json
 import csv 
 from collections import defaultdict
-import pickle
 import copy
 
 def hash_key(message):
@@ -69,30 +68,8 @@ def dict_ingredientes():
                 line_count += 1
     return dict_ingredientes
 
-# Mover a despacho
-def mover_a_despacho():
-    lotes = int(80/6) + 1
-    mover = 0
-    almacenes = {
-                'recepcion': '5cc7b139a823b10004d8e6d9',
-                'pulmon': '5cc7b139a823b10004d8e6dd',
-                'cocina': '5cc7b139a823b10004d8e6de',
-                'despacho': '5cc7b139a823b10004d8e6da',
-                'otro1': "5cc7b139a823b10004d8e6dc",
-                'otro2': "5cc7b139a823b10004d8e6db"
-            }
-    for a in almacenes:
-            uri = 'https://integracion-2019-prod.herokuapp.com/bodega/'
-            headers={"Content-Type": "application/json", "Authorization": str(hash_key('GET'+almacenes[a]+'1010'))}
-            r = requests.get(uri+'stock', headers=headers, params={"almacenId":almacenes[a], 'sku':'1010'})
-            for i in r.json():
-                headers={"Content-Type": "application/json", "Authorization": str(hash_key(str('POST'+i['_id']+almacenes['despacho'])))}
-                if mover > 0:
-                    enviar = requests.post(uri+'moveStock', headers=headers, json={"productoId":i['_id'], 'almacenId':almacenes['despacho']})
-                    print(enviar.json())
-                    mover -= 1
+# FabricarSinPago
 def Fabricar(sku, cantidad):
-    # Fabricar
     uri = 'https://integracion-2019-prod.herokuapp.com/bodega/'
     headers={"Content-Type": "application/json", "Authorization": str(hash_key(str('PUT'+sku+str(cantidad))))}
     enviar = requests.put(uri+'fabrica/fabricarSinPago', headers=headers, json={"sku":sku, 'cantidad':cantidad})
@@ -160,6 +137,7 @@ def esta_completo(sku, cantidad, lote):
             todos = False
     return todos
 
+# Ver cuales de los productos minimos esta tienen todos sus ingredientes
 def ver_completos():
     mini = minimos()
     ings = dict_ingredientes()
@@ -173,7 +151,7 @@ def ver_completos():
             print(i)
     return completos
 
-def limpiar_despacho():
+def limpiar_despacho(origen, destino):
     almacenes = {
                 'recepcion': '5cc7b139a823b10004d8e6d9',
                 'pulmon': '5cc7b139a823b10004d8e6dd',
@@ -183,14 +161,14 @@ def limpiar_despacho():
                 'otro2': "5cc7b139a823b10004d8e6db"
             }
     uri = 'https://integracion-2019-prod.herokuapp.com/bodega/'
-    headers={"Content-Type": "application/json", "Authorization": str(hash_key('GET'+'5cc7b139a823b10004d8e6d9'))}
-    r = requests.get(uri+'skusWithStock', headers=headers, params={"almacenId":'5cc7b139a823b10004d8e6d9'})
+    headers={"Content-Type": "application/json", "Authorization": str(hash_key('GET'+almacenes[origen]))}
+    r = requests.get(uri+'skusWithStock', headers=headers, params={"almacenId":almacenes[origen]})
     for i in r.json():
-        headers={"Content-Type": "application/json", "Authorization": str(hash_key('GET'+'5cc7b139a823b10004d8e6d9'+str(i['_id'])))}
-        r2 = requests.get(uri+'stock', headers=headers, params={"almacenId":'5cc7b139a823b10004d8e6d9', 'sku':i['_id']})
+        headers={"Content-Type": "application/json", "Authorization": str(hash_key('GET'+almacenes[origen]+str(i['_id'])))}
+        r2 = requests.get(uri+'stock', headers=headers, params={"almacenId":almacenes[origen], 'sku':i['_id']})
         for x in r2.json():
-            headers={"Content-Type": "application/json", "Authorization": str(hash_key(str('POST'+x['_id']+"5cc7b139a823b10004d8e6db")))}
-            enviar = requests.post(uri+'moveStock', headers=headers, json={"productoId":x['_id'], 'almacenId':"5cc7b139a823b10004d8e6db"})
+            headers={"Content-Type": "application/json", "Authorization": str(hash_key(str('POST'+x['_id']+almacenes[destino])))}
+            enviar = requests.post(uri+'moveStock', headers=headers, json={"productoId":x['_id'], 'almacenId':almacenes[destino]})
             print(enviar.json())
 
 
@@ -234,8 +212,8 @@ def fabricar_sku(sku, falta, lote):
         orden['sku_destino'] = completo
         ordenes = {}
         ordenes[orden['sku']] = orden
-        pickle.dump( ordenes, open( "ordenes.p", "wb" ) )
 
+# Imprimir el stock por almacen
 def imprimir_stock_almacen():
     almacenes = {
         'recepcion': '5cc7b139a823b10004d8e6d9',
@@ -249,12 +227,14 @@ def imprimir_stock_almacen():
         print(x)
         print(skusWithStock(x))
 
+# Ver cuales elementos tienen el stock minimo
 def imprimir_estado():
     m = minimos()
     s = ver_stock()
     for i in m:
         print(str(i), s[i], int(m[i]['cantidad']), s[i] >= int(m[i]['cantidad']))
 
+# Enviar productos a otro grupo
 def enviar_produtos(sku, almacenId, cantidad):
     almacenes = {
             'recepcion': '5cc7b139a823b10004d8e6d9',
@@ -280,14 +260,3 @@ def enviar_produtos(sku, almacenId, cantidad):
                 print(enviar.json())
 
 
-
-#limpiar_despacho()
-#fabricar_sku('1307', 11,11)
-#x = Fabricar('1201', 10)
-#print(x)
-#x = ver_stock()
-#print(x)
-#print((cual_falta_total()))
-#imprimir_stock_almacen()
-imprimir_estado()
-#x = ver_completos()
